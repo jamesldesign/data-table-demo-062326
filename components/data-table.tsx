@@ -73,6 +73,23 @@ const COLUMN_LABELS: Record<string, string> = {
   notes: "Notes",
 }
 
+// Fixed column widths (px) so the separate header and body tables stay aligned.
+const COLUMN_WIDTHS: Record<string, number> = {
+  select: 48,
+  id: 96,
+  name: 220,
+  owner: 150,
+  status: 120,
+  priority: 150,
+  enabled: 100,
+  progress: 200,
+  budget: 130,
+  notes: 220,
+  actions: 64,
+}
+
+const DEFAULT_COLUMN_WIDTH = 140
+
 function downloadCsv(rows: Project[]) {
   const headers: (keyof Project)[] = [
     "id",
@@ -147,6 +164,26 @@ export function DataTable() {
 
   const filteredRows = table.getFilteredRowModel().rows
   const selectedCount = table.getFilteredSelectedRowModel().rows.length
+
+  // Keep the (non-scrolling) header horizontally in sync with the body's scroll.
+  const headerScrollRef = React.useRef<HTMLDivElement>(null)
+  const onBodyScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (headerScrollRef.current) {
+      headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft
+    }
+  }
+
+  const visibleColumns = table.getVisibleLeafColumns()
+  const colgroup = (
+    <colgroup>
+      {visibleColumns.map((column) => (
+        <col
+          key={column.id}
+          style={{ width: COLUMN_WIDTHS[column.id] ?? DEFAULT_COLUMN_WIDTH }}
+        />
+      ))}
+    </colgroup>
+  )
 
   const tableUi = (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-card">
@@ -258,15 +295,19 @@ export function DataTable() {
         </div>
       </div>
 
-      {/* Single scroll container: scrolls both axes, header stays sticky,
-          and the horizontal scrollbar stays pinned just above the footer */}
-      <div className="relative min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[32rem] caption-bottom text-sm">
-          <TableHeader className="sticky top-0 z-10 bg-neutral-100 shadow-[inset_0_-1px_0_var(--border)]">
+      {/* Header table lives in its own non-scrolling container, so the body's
+          vertical scrollbar only appears next to the rows, never the header. */}
+      <div
+        ref={headerScrollRef}
+        className="overflow-x-hidden border-b bg-neutral-50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <table className="w-full min-w-[32rem] table-fixed caption-bottom text-sm">
+          {colgroup}
+          <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="hover:bg-transparent">
+              <TableRow key={headerGroup.id} className="border-b-0 hover:bg-transparent">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="bg-neutral-100">
+                  <TableHead key={header.id} className="bg-neutral-50">
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -275,6 +316,14 @@ export function DataTable() {
               </TableRow>
             ))}
           </TableHeader>
+        </table>
+      </div>
+
+      {/* Body scroll container: owns both scroll axes. Its vertical scrollbar
+          sits beside the rows, and the horizontal scrollbar pins above the footer. */}
+      <div className="min-h-0 flex-1 overflow-auto" onScroll={onBodyScroll}>
+        <table className="w-full min-w-[32rem] table-fixed caption-bottom text-sm">
+          {colgroup}
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
@@ -289,7 +338,7 @@ export function DataTable() {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={table.getAllColumns().length}
+                  colSpan={visibleColumns.length}
                   className="h-32 text-center text-muted-foreground"
                 >
                   No results found.
