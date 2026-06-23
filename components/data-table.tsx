@@ -107,13 +107,16 @@ function downloadCsv(rows: Project[]) {
   URL.revokeObjectURL(url)
 }
 
-// Sticky positioning styles for pinned (sticky) columns.
-// A fixed width is required so the sticky left/right offsets (derived from
-// column sizes) line up exactly with the rendered cell widths.
-function getPinningStyles(column: Column<Project>): React.CSSProperties {
+// Sticky positioning + border/shadow styles for pinned columns.
+// Borders and shadows are applied inline (not via Tailwind) so they are never
+// overridden by base table styles or clipped by overflow containers.
+function getPinningStyles(column: Column<Project>, isHeader = false): React.CSSProperties {
   const pinned = column.getIsPinned()
   if (!pinned) return {}
   const width = column.getSize()
+  const isLeftEdge = pinned === "left" && column.getIsLastColumn("left")
+  const isRightEdge = pinned === "right" && column.getIsFirstColumn("right")
+
   return {
     position: "sticky",
     left: pinned === "left" ? column.getStart("left") : undefined,
@@ -121,6 +124,17 @@ function getPinningStyles(column: Column<Project>): React.CSSProperties {
     width,
     minWidth: width,
     maxWidth: width,
+    // Border on the exposed edge of the pinned group.
+    borderRight: isLeftEdge ? "1px solid var(--border)" : undefined,
+    borderLeft: isRightEdge ? "1px solid var(--border)" : undefined,
+    // Shadow cast onto the scrolling content — always visible while sticky.
+    boxShadow: isLeftEdge
+      ? "4px 0 8px -2px rgba(0,0,0,0.15)"
+      : isRightEdge
+        ? "-4px 0 8px -2px rgba(0,0,0,0.15)"
+        : undefined,
+    // Header cells sit above body cells; bump their z-index accordingly.
+    zIndex: isHeader ? 31 : 11,
   }
 }
 
@@ -331,21 +345,11 @@ export function DataTable() {
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
                   const pinned = header.column.getIsPinned()
-                  const isLeftEdge = pinned === "left" && header.column.getIsLastColumn("left")
-                  const isRightEdge =
-                    pinned === "right" && header.column.getIsFirstColumn("right")
                   return (
                     <TableHead
                       key={header.id}
-                      style={getPinningStyles(header.column)}
-                      className={cn(
-                        "bg-neutral-50",
-                        pinned && "z-30",
-                        isLeftEdge &&
-                          "border-r border-border shadow-[4px_0_6px_-2px_rgba(0,0,0,0.12)]",
-                        isRightEdge &&
-                          "border-l border-border shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.12)]",
-                      )}
+                      style={getPinningStyles(header.column, true)}
+                      className={cn("bg-neutral-50", pinned && "z-30")}
                     >
                       {header.isPlaceholder
                         ? null
@@ -366,9 +370,6 @@ export function DataTable() {
                 >
                   {row.getVisibleCells().map((cell) => {
                     const pinned = cell.column.getIsPinned()
-                    const isLeftEdge = pinned === "left" && cell.column.getIsLastColumn("left")
-                    const isRightEdge =
-                      pinned === "right" && cell.column.getIsFirstColumn("right")
                     return (
                       <TableCell
                         key={cell.id}
@@ -376,10 +377,6 @@ export function DataTable() {
                         className={cn(
                           pinned &&
                             "z-10 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted",
-                          isLeftEdge &&
-                            "border-r border-border shadow-[4px_0_6px_-2px_rgba(0,0,0,0.12)]",
-                          isRightEdge &&
-                            "border-l border-border shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.12)]",
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
