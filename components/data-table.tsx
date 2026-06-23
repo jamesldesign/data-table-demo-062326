@@ -183,10 +183,10 @@ export function DataTable() {
   const toggleStickyEdges = (checked: boolean) => {
     if (checked) {
       const leaves = table.getAllLeafColumns()
-      const first = leaves[0]?.id
+      const left = leaves.slice(0, 2).map((c) => c.id)
       const last = leaves[leaves.length - 1]?.id
       setColumnPinning({
-        left: first ? [first] : [],
+        left,
         right: last ? [last] : [],
       })
     } else {
@@ -325,16 +325,20 @@ export function DataTable() {
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
                   const pinned = header.column.getIsPinned()
+                  const isLeftEdge = pinned === "left" && header.column.getIsLastColumn("left")
+                  const isRightEdge =
+                    pinned === "right" && header.column.getIsFirstColumn("right")
                   return (
                     <TableHead
                       key={header.id}
                       style={getPinningStyles(header.column)}
                       className={cn(
                         "bg-neutral-50",
-                        pinned === "left" &&
-                          "z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.2)]",
-                        pinned === "right" &&
-                          "z-30 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.2)]",
+                        pinned && "z-30",
+                        isLeftEdge &&
+                          "border-r border-border shadow-[4px_0_6px_-2px_rgba(0,0,0,0.12)]",
+                        isRightEdge &&
+                          "border-l border-border shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.12)]",
                       )}
                     >
                       {header.isPlaceholder
@@ -356,6 +360,9 @@ export function DataTable() {
                 >
                   {row.getVisibleCells().map((cell) => {
                     const pinned = cell.column.getIsPinned()
+                    const isLeftEdge = pinned === "left" && cell.column.getIsLastColumn("left")
+                    const isRightEdge =
+                      pinned === "right" && cell.column.getIsFirstColumn("right")
                     return (
                       <TableCell
                         key={cell.id}
@@ -363,10 +370,10 @@ export function DataTable() {
                         className={cn(
                           pinned &&
                             "z-10 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted",
-                          pinned === "left" &&
-                            "shadow-[2px_0_5px_-2px_rgba(0,0,0,0.2)]",
-                          pinned === "right" &&
-                            "shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.2)]",
+                          isLeftEdge &&
+                            "border-r border-border shadow-[4px_0_6px_-2px_rgba(0,0,0,0.12)]",
+                          isRightEdge &&
+                            "border-l border-border shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.12)]",
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
