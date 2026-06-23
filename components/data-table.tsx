@@ -1,0 +1,394 @@
+"use client"
+
+import * as React from "react"
+import {
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Download,
+  Filter,
+  Maximize2,
+  Minimize2,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react"
+
+import { columns } from "@/components/data-table-columns"
+import { generateProjects, type Project, type Status } from "@/lib/data"
+import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+const STATUS_OPTIONS: Status[] = ["active", "pending", "archived"]
+
+// Column id -> human label for the visibility menu.
+const COLUMN_LABELS: Record<string, string> = {
+  id: "ID",
+  name: "Project",
+  owner: "Owner",
+  status: "Status",
+  priority: "Priority",
+  enabled: "Enabled",
+  progress: "Progress",
+  budget: "Budget",
+  notes: "Notes",
+}
+
+function downloadCsv(rows: Project[]) {
+  const headers: (keyof Project)[] = [
+    "id",
+    "name",
+    "owner",
+    "status",
+    "priority",
+    "enabled",
+    "progress",
+    "budget",
+    "notes",
+  ]
+  const escape = (value: unknown) => {
+    const str = String(value ?? "")
+    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
+  }
+  const csv = [
+    headers.join(","),
+    ...rows.map((row) => headers.map((key) => escape(row[key])).join(",")),
+  ].join("\n")
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `projects-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+export function DataTable() {
+  const [data, setData] = React.useState<Project[]>(() => generateProjects(120))
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const [rowSelection, setRowSelection] = React.useState({})
+  const [globalFilter, setGlobalFilter] = React.useState("")
+  const [expanded, setExpanded] = React.useState(false)
+
+  const table = useReactTable({
+    data,
+    columns,
+    state: { sorting, columnFilters, columnVisibility, rowSelection, globalFilter },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: "includesString",
+    getRowId: (row) => row.id,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    meta: {
+      updateData: (rowId, columnId, value) => {
+        setData((prev) =>
+          prev.map((row) => (row.id === rowId ? { ...row, [columnId]: value } : row)),
+        )
+      },
+    },
+  })
+
+  const statusFilter = (table.getColumn("status")?.getFilterValue() as string[]) ?? []
+
+  const toggleStatus = (status: Status, checked: boolean) => {
+    const next = checked
+      ? [...statusFilter, status]
+      : statusFilter.filter((s) => s !== status)
+    table.getColumn("status")?.setFilterValue(next.length ? next : undefined)
+  }
+
+  const filteredRows = table.getFilteredRowModel().rows
+  const selectedCount = table.getFilteredSelectedRowModel().rows.length
+
+  const tableUi = (
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-card">
+      {/* Sticky controls bar */}
+      <div className="flex flex-wrap items-center gap-2 border-b bg-card p-3">
+        <div className="relative flex-1 sm:min-w-64 sm:flex-initial">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            placeholder="Search projects..."
+            className="h-9 pl-8"
+            aria-label="Search"
+          />
+        </div>
+
+        {/* Filter */}
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-9" />}>
+            <Filter data-icon="inline-start" />
+            Filter
+            {statusFilter.length > 0 && (
+              <Badge variant="secondary" className="ml-1 rounded-sm px-1">
+                {statusFilter.length}
+              </Badge>
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-44">
+            <DropdownMenuLabel>Status</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {STATUS_OPTIONS.map((status) => (
+              <DropdownMenuCheckboxItem
+                key={status}
+                className="capitalize"
+                checked={statusFilter.includes(status)}
+                onCheckedChange={(checked) => toggleStatus(status, !!checked)}
+                closeOnClick={false}
+              >
+                {status}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Column visibility */}
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-9" />}>
+            <SlidersHorizontal data-icon="inline-start" />
+            Columns
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide() && COLUMN_LABELS[column.id])
+              .map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  checked={column.getIsVisible()}
+                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  closeOnClick={false}
+                >
+                  {COLUMN_LABELS[column.id]}
+                </DropdownMenuCheckboxItem>
+              ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="ml-auto flex items-center gap-2">
+          {(statusFilter.length > 0 || globalFilter) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9"
+              onClick={() => {
+                setGlobalFilter("")
+                table.resetColumnFilters()
+              }}
+            >
+              <X data-icon="inline-start" />
+              Reset
+            </Button>
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={() => downloadCsv(filteredRows.map((r) => r.original))}
+          >
+            <Download data-icon="inline-start" />
+            <span className="hidden sm:inline">Download CSV</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-9"
+            onClick={() => setExpanded((v) => !v)}
+            aria-label={expanded ? "Collapse table" : "Expand table"}
+          >
+            {expanded ? <Minimize2 /> : <Maximize2 />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Scrollable body with sticky header */}
+      <div className="min-h-0 flex-1 overflow-auto">
+        <Table>
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--border)]">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="hover:bg-transparent">
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id} className="bg-card">
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={table.getAllColumns().length}
+                  className="h-32 text-center text-muted-foreground"
+                >
+                  No results found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Sticky footer */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-card px-3 py-2.5">
+        <div className="text-sm text-muted-foreground">
+          {selectedCount > 0 ? `${selectedCount} of ` : ""}
+          <span className="font-medium text-foreground">{filteredRows.length}</span>{" "}
+          {filteredRows.length === 1 ? "result" : "results"}
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="hidden text-sm text-muted-foreground sm:inline">Rows per page</span>
+            <Select
+              value={String(table.getState().pagination.pageSize)}
+              onValueChange={(value) => table.setPageSize(Number(value))}
+            >
+              <SelectTrigger size="sm" className="w-[72px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {[10, 20, 30, 50, 100].map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="text-sm font-medium tabular-nums">
+            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-8"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+              aria-label="First page"
+            >
+              <ChevronsLeft />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-8"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              aria-label="Previous page"
+            >
+              <ChevronLeft />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-8"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              aria-label="Next page"
+            >
+              <ChevronRight />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-8"
+              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              disabled={!table.getCanNextPage()}
+              aria-label="Last page"
+            >
+              <ChevronsRight />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      <div className={cn("h-[640px]", expanded && "invisible")}>{!expanded && tableUi}</div>
+
+      <Dialog open={expanded} onOpenChange={setExpanded}>
+        <DialogContent
+          showCloseButton={false}
+          className="top-0 left-0 h-screen max-h-screen w-screen max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-0 p-3 ring-0 sm:max-w-none"
+        >
+          <DialogTitle className="sr-only">Projects data table (expanded)</DialogTitle>
+          {expanded && tableUi}
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
