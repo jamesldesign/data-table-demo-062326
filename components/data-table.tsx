@@ -106,7 +106,7 @@ function downloadCsv(rows: Project[]) {
 
 export function DataTable() {
   const [data, setData] = React.useState<Project[]>(() => generateProjects(120))
-  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [sorting, setSorting] = React.useState<SortingState>([{ id: "id", desc: false }])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
@@ -152,8 +152,8 @@ export function DataTable() {
   const tableUi = (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-card">
       {/* Sticky controls bar */}
-      <div className="flex flex-wrap items-center gap-2 border-b bg-card p-3">
-        <div className="relative flex-1 sm:min-w-64 sm:flex-initial">
+      <div className="flex flex-wrap items-center gap-2 border-b bg-neutral-100 p-3">
+        <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={globalFilter}
@@ -164,64 +164,7 @@ export function DataTable() {
           />
         </div>
 
-        {/* Filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-9" />}>
-            <Filter data-icon="inline-start" />
-            Filter
-            {statusFilter.length > 0 && (
-              <Badge variant="secondary" className="ml-1 rounded-sm px-1">
-                {statusFilter.length}
-              </Badge>
-            )}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-44">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Status</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {STATUS_OPTIONS.map((status) => (
-                <DropdownMenuCheckboxItem
-                  key={status}
-                  className="capitalize"
-                  checked={statusFilter.includes(status)}
-                  onCheckedChange={(checked) => toggleStatus(status, !!checked)}
-                  closeOnClick={false}
-                >
-                  {status}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Column visibility */}
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-9" />}>
-            <SlidersHorizontal data-icon="inline-start" />
-            Columns
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide() && COLUMN_LABELS[column.id])
-                .map((column) => (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                    closeOnClick={false}
-                  >
-                    {COLUMN_LABELS[column.id]}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
           {(statusFilter.length > 0 || globalFilter) && (
             <Button
               variant="ghost"
@@ -236,6 +179,63 @@ export function DataTable() {
               Reset
             </Button>
           )}
+
+          {/* Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-9" />}>
+              <Filter data-icon="inline-start" />
+              Filter
+              {statusFilter.length > 0 && (
+                <Badge variant="secondary" className="ml-1 rounded-sm px-1">
+                  {statusFilter.length}
+                </Badge>
+              )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {STATUS_OPTIONS.map((status) => (
+                  <DropdownMenuCheckboxItem
+                    key={status}
+                    className="capitalize"
+                    checked={statusFilter.includes(status)}
+                    onCheckedChange={(checked) => toggleStatus(status, !!checked)}
+                    closeOnClick={false}
+                  >
+                    {status}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Column visibility */}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-9" />}>
+              <SlidersHorizontal data-icon="inline-start" />
+              Columns
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide() && COLUMN_LABELS[column.id])
+                  .map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                      closeOnClick={false}
+                    >
+                      {COLUMN_LABELS[column.id]}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button
             variant="outline"
@@ -261,12 +261,12 @@ export function DataTable() {
 
       {/* Scrollable body with sticky header */}
       <div className="min-h-0 flex-1 overflow-auto">
-        <Table>
-          <TableHeader className="sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--border)]">
+        <Table className="min-w-[64rem]">
+          <TableHeader className="sticky top-0 z-10 bg-neutral-100 shadow-[inset_0_-1px_0_var(--border)]">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="bg-card">
+                  <TableHead key={header.id} className="bg-neutral-100">
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -301,7 +301,7 @@ export function DataTable() {
       </div>
 
       {/* Sticky footer */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-card px-3 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-neutral-100 px-3 py-2.5">
         <div className="text-sm text-muted-foreground">
           {selectedCount > 0 ? `${selectedCount} of ` : ""}
           <span className="font-medium text-foreground">{filteredRows.length}</span>{" "}
