@@ -261,7 +261,7 @@ export function DataTable() {
       {/* Single scroll container: scrolls both axes, header stays sticky,
           and the horizontal scrollbar stays pinned just above the footer */}
       <div className="relative min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[64rem] caption-bottom text-sm">
+        <table className="w-full min-w-[32rem] caption-bottom text-sm">
           <TableHeader className="sticky top-0 z-10 bg-neutral-100 shadow-[inset_0_-1px_0_var(--border)]">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
@@ -383,7 +383,9 @@ export function DataTable() {
 
   return (
     <>
-      <div className={cn("h-[640px]", expanded && "invisible")}>{!expanded && tableUi}</div>
+      <div className={cn("flex min-h-[30rem] max-h-[50rem] flex-col", expanded && "invisible")}>
+        {!expanded && tableUi}
+      </div>
 
       <Dialog open={expanded} onOpenChange={setExpanded}>
         <DialogContent
