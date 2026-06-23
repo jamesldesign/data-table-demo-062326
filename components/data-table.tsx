@@ -42,7 +42,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -259,11 +258,10 @@ export function DataTable() {
         </div>
       </div>
 
-      {/* Horizontal scroll container (scrollbar stays pinned above the footer) */}
-      <div className="min-h-0 flex-1 overflow-x-auto">
-        {/* Vertical scroll wrapper with sticky header */}
-        <div className="h-full overflow-y-auto">
-        <Table className="min-w-[64rem]">
+      {/* Single scroll container: scrolls both axes, header stays sticky,
+          and the horizontal scrollbar stays pinned just above the footer */}
+      <div className="relative min-h-0 flex-1 overflow-auto">
+        <table className="w-full min-w-[64rem] caption-bottom text-sm">
           <TableHeader className="sticky top-0 z-10 bg-neutral-100 shadow-[inset_0_-1px_0_var(--border)]">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
@@ -299,8 +297,7 @@ export function DataTable() {
               </TableRow>
             )}
           </TableBody>
-        </Table>
-        </div>
+        </table>
       </div>
 
       {/* Sticky footer */}
