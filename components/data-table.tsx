@@ -159,7 +159,7 @@ export function DataTable() {
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder="Search projects..."
-            className="h-9 pl-8"
+            className="h-9 bg-white pl-8"
             aria-label="Search"
           />
         </div>
@@ -259,8 +259,10 @@ export function DataTable() {
         </div>
       </div>
 
-      {/* Scrollable body with sticky header */}
-      <div className="min-h-0 flex-1 overflow-auto">
+      {/* Horizontal scroll container (scrollbar stays pinned above the footer) */}
+      <div className="min-h-0 flex-1 overflow-x-auto">
+        {/* Vertical scroll wrapper with sticky header */}
+        <div className="h-full overflow-y-auto">
         <Table className="min-w-[64rem]">
           <TableHeader className="sticky top-0 z-10 bg-neutral-100 shadow-[inset_0_-1px_0_var(--border)]">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -298,6 +300,7 @@ export function DataTable() {
             )}
           </TableBody>
         </Table>
+        </div>
       </div>
 
       {/* Sticky footer */}
