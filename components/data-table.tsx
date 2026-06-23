@@ -2,7 +2,9 @@
 
 import * as React from "react"
 import {
+  type Column,
   type ColumnFiltersState,
+  type ColumnPinningState,
   type SortingState,
   type VisibilityState,
   flexRender,
@@ -21,6 +23,7 @@ import {
   Filter,
   Maximize2,
   Minimize2,
+  Pin,
   Search,
   SlidersHorizontal,
   X,
@@ -32,6 +35,7 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   Select,
@@ -42,7 +46,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -104,24 +107,47 @@ function downloadCsv(rows: Project[]) {
   URL.revokeObjectURL(url)
 }
 
+// Sticky positioning styles for pinned (sticky) columns.
+function getPinningStyles(column: Column<Project>): React.CSSProperties {
+  const pinned = column.getIsPinned()
+  if (!pinned) return {}
+  return {
+    position: "sticky",
+    left: pinned === "left" ? column.getStart("left") : undefined,
+    right: pinned === "right" ? column.getAfter("right") : undefined,
+  }
+}
+
 export function DataTable() {
   const [data, setData] = React.useState<Project[]>(() => generateProjects(120))
-  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [sorting, setSorting] = React.useState<SortingState>([{ id: "id", desc: false }])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState("")
   const [expanded, setExpanded] = React.useState(false)
+  const [columnPinning, setColumnPinning] = React.useState<ColumnPinningState>({
+    left: [],
+    right: [],
+  })
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, columnFilters, columnVisibility, rowSelection, globalFilter },
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+      globalFilter,
+      columnPinning,
+    },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnPinningChange: setColumnPinning,
     globalFilterFn: "includesString",
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
@@ -149,79 +175,41 @@ export function DataTable() {
   const filteredRows = table.getFilteredRowModel().rows
   const selectedCount = table.getFilteredSelectedRowModel().rows.length
 
+  const visibleColumns = table.getVisibleLeafColumns()
+
+  // Sticky edge columns: pin the first column to the left and last to the right.
+  const stickyEdges = (columnPinning.left?.length ?? 0) > 0
+
+  const toggleStickyEdges = (checked: boolean) => {
+    if (checked) {
+      const leaves = table.getAllLeafColumns()
+      const left = leaves.slice(0, 2).map((c) => c.id)
+      const last = leaves[leaves.length - 1]?.id
+      setColumnPinning({
+        left,
+        right: last ? [last] : [],
+      })
+    } else {
+      setColumnPinning({ left: [], right: [] })
+    }
+  }
+
   const tableUi = (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-card">
       {/* Sticky controls bar */}
-      <div className="flex flex-wrap items-center gap-2 border-b bg-card p-3">
-        <div className="relative flex-1 sm:min-w-64 sm:flex-initial">
+      <div className="flex flex-wrap items-center gap-2 border-b bg-neutral-100 p-3">
+        <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder="Search projects..."
-            className="h-9 pl-8"
+            className="h-9 bg-white pl-8"
             aria-label="Search"
           />
         </div>
 
-        {/* Filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-9" />}>
-            <Filter data-icon="inline-start" />
-            Filter
-            {statusFilter.length > 0 && (
-              <Badge variant="secondary" className="ml-1 rounded-sm px-1">
-                {statusFilter.length}
-              </Badge>
-            )}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-44">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Status</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {STATUS_OPTIONS.map((status) => (
-                <DropdownMenuCheckboxItem
-                  key={status}
-                  className="capitalize"
-                  checked={statusFilter.includes(status)}
-                  onCheckedChange={(checked) => toggleStatus(status, !!checked)}
-                  closeOnClick={false}
-                >
-                  {status}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Column visibility */}
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-9" />}>
-            <SlidersHorizontal data-icon="inline-start" />
-            Columns
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide() && COLUMN_LABELS[column.id])
-                .map((column) => (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                    closeOnClick={false}
-                  >
-                    {COLUMN_LABELS[column.id]}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
           {(statusFilter.length > 0 || globalFilter) && (
             <Button
               variant="ghost"
@@ -236,6 +224,75 @@ export function DataTable() {
               Reset
             </Button>
           )}
+
+          {/* Sticky edge columns toggle */}
+          <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium">
+            <Pin
+              className={cn(
+                "size-4",
+                stickyEdges ? "text-foreground" : "text-muted-foreground",
+              )}
+            />
+            <span className="hidden sm:inline">Sticky edges</span>
+            <Switch checked={stickyEdges} onCheckedChange={toggleStickyEdges} />
+          </label>
+
+          {/* Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-9" />}>
+              <Filter data-icon="inline-start" />
+              Filter
+              {statusFilter.length > 0 && (
+                <Badge variant="secondary" className="ml-1 rounded-sm px-1">
+                  {statusFilter.length}
+                </Badge>
+              )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {STATUS_OPTIONS.map((status) => (
+                  <DropdownMenuCheckboxItem
+                    key={status}
+                    className="capitalize"
+                    checked={statusFilter.includes(status)}
+                    onCheckedChange={(checked) => toggleStatus(status, !!checked)}
+                    closeOnClick={false}
+                  >
+                    {status}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Column visibility */}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-9" />}>
+              <SlidersHorizontal data-icon="inline-start" />
+              Columns
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide() && COLUMN_LABELS[column.id])
+                  .map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                      closeOnClick={false}
+                    >
+                      {COLUMN_LABELS[column.id]}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button
             variant="outline"
@@ -259,37 +316,76 @@ export function DataTable() {
         </div>
       </div>
 
-      {/* Scrollable body with sticky header */}
-      <div className="min-h-0 flex-1 overflow-auto">
-        <Table>
-          <TableHeader className="sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--border)]">
+      {/* Single scroll container: scrolls both axes, header stays sticky,
+          and the horizontal scrollbar stays pinned just above the footer */}
+      <div className="relative min-h-0 flex-1 overflow-auto">
+        <table className="w-full min-w-[32rem] caption-bottom text-sm">
+          <TableHeader className="sticky top-0 z-20 bg-neutral-50 shadow-[inset_0_-1px_0_var(--border)]">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="bg-card">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  const pinned = header.column.getIsPinned()
+                  const isLeftEdge = pinned === "left" && header.column.getIsLastColumn("left")
+                  const isRightEdge =
+                    pinned === "right" && header.column.getIsFirstColumn("right")
+                  return (
+                    <TableHead
+                      key={header.id}
+                      style={getPinningStyles(header.column)}
+                      className={cn(
+                        "bg-neutral-50",
+                        pinned && "z-30",
+                        isLeftEdge &&
+                          "border-r border-border shadow-[4px_0_6px_-2px_rgba(0,0,0,0.12)]",
+                        isRightEdge &&
+                          "border-l border-border shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.12)]",
+                      )}
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
+                  )
+                })}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  className="group/row"
+                >
+                  {row.getVisibleCells().map((cell) => {
+                    const pinned = cell.column.getIsPinned()
+                    const isLeftEdge = pinned === "left" && cell.column.getIsLastColumn("left")
+                    const isRightEdge =
+                      pinned === "right" && cell.column.getIsFirstColumn("right")
+                    return (
+                      <TableCell
+                        key={cell.id}
+                        style={getPinningStyles(cell.column)}
+                        className={cn(
+                          pinned &&
+                            "z-10 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted",
+                          isLeftEdge &&
+                            "border-r border-border shadow-[4px_0_6px_-2px_rgba(0,0,0,0.12)]",
+                          isRightEdge &&
+                            "border-l border-border shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.12)]",
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    )
+                  })}
                 </TableRow>
               ))
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={table.getAllColumns().length}
+                  colSpan={visibleColumns.length}
                   className="h-32 text-center text-muted-foreground"
                 >
                   No results found.
@@ -297,11 +393,11 @@ export function DataTable() {
               </TableRow>
             )}
           </TableBody>
-        </Table>
+        </table>
       </div>
 
       {/* Sticky footer */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-card px-3 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-neutral-100 px-3 py-2.5">
         <div className="text-sm text-muted-foreground">
           {selectedCount > 0 ? `${selectedCount} of ` : ""}
           <span className="font-medium text-foreground">{filteredRows.length}</span>{" "}
@@ -383,7 +479,9 @@ export function DataTable() {
 
   return (
     <>
-      <div className={cn("h-[640px]", expanded && "invisible")}>{!expanded && tableUi}</div>
+      <div className={cn("flex min-h-[30rem] max-h-[50rem] flex-col", expanded && "invisible")}>
+        {!expanded && tableUi}
+      </div>
 
       <Dialog open={expanded} onOpenChange={setExpanded}>
         <DialogContent

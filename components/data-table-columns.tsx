@@ -222,11 +222,9 @@ export const columns: ColumnDef<Project>[] = [
     cell: ({ row }) => {
       const value = row.getValue("progress") as number
       return (
-        <div className="flex w-36 items-center gap-2">
+        <div className="flex w-40 items-center gap-2">
+          <span className="w-9 text-xs tabular-nums text-muted-foreground">{value}%</span>
           <Progress value={value} className="h-2" />
-          <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
-            {value}%
-          </span>
         </div>
       )
     },
