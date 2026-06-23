@@ -2,7 +2,9 @@
 
 import * as React from "react"
 import {
+  type Column,
   type ColumnFiltersState,
+  type ColumnPinningState,
   type SortingState,
   type VisibilityState,
   flexRender,
@@ -21,6 +23,7 @@ import {
   Filter,
   Maximize2,
   Minimize2,
+  Pin,
   Search,
   SlidersHorizontal,
   X,
@@ -32,6 +35,7 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   Select,
@@ -103,6 +107,17 @@ function downloadCsv(rows: Project[]) {
   URL.revokeObjectURL(url)
 }
 
+// Sticky positioning styles for pinned (sticky) columns.
+function getPinningStyles(column: Column<Project>): React.CSSProperties {
+  const pinned = column.getIsPinned()
+  if (!pinned) return {}
+  return {
+    position: "sticky",
+    left: pinned === "left" ? column.getStart("left") : undefined,
+    right: pinned === "right" ? column.getAfter("right") : undefined,
+  }
+}
+
 export function DataTable() {
   const [data, setData] = React.useState<Project[]>(() => generateProjects(120))
   const [sorting, setSorting] = React.useState<SortingState>([{ id: "id", desc: false }])
@@ -111,16 +126,28 @@ export function DataTable() {
   const [rowSelection, setRowSelection] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState("")
   const [expanded, setExpanded] = React.useState(false)
+  const [columnPinning, setColumnPinning] = React.useState<ColumnPinningState>({
+    left: [],
+    right: [],
+  })
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, columnFilters, columnVisibility, rowSelection, globalFilter },
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+      globalFilter,
+      columnPinning,
+    },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnPinningChange: setColumnPinning,
     globalFilterFn: "includesString",
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
@@ -149,6 +176,23 @@ export function DataTable() {
   const selectedCount = table.getFilteredSelectedRowModel().rows.length
 
   const visibleColumns = table.getVisibleLeafColumns()
+
+  // Sticky edge columns: pin the first column to the left and last to the right.
+  const stickyEdges = (columnPinning.left?.length ?? 0) > 0
+
+  const toggleStickyEdges = (checked: boolean) => {
+    if (checked) {
+      const leaves = table.getAllLeafColumns()
+      const first = leaves[0]?.id
+      const last = leaves[leaves.length - 1]?.id
+      setColumnPinning({
+        left: first ? [first] : [],
+        right: last ? [last] : [],
+      })
+    } else {
+      setColumnPinning({ left: [], right: [] })
+    }
+  }
 
   const tableUi = (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-card">
@@ -180,6 +224,18 @@ export function DataTable() {
               Reset
             </Button>
           )}
+
+          {/* Sticky edge columns toggle */}
+          <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium">
+            <Pin
+              className={cn(
+                "size-4",
+                stickyEdges ? "text-foreground" : "text-muted-foreground",
+              )}
+            />
+            <span className="hidden sm:inline">Sticky edges</span>
+            <Switch checked={stickyEdges} onCheckedChange={toggleStickyEdges} />
+          </label>
 
           {/* Filter */}
           <DropdownMenu>
@@ -264,28 +320,59 @@ export function DataTable() {
           and the horizontal scrollbar stays pinned just above the footer */}
       <div className="relative min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-[32rem] caption-bottom text-sm">
-          <TableHeader className="sticky top-0 z-10 bg-neutral-50 shadow-[inset_0_-1px_0_var(--border)]">
+          <TableHeader className="sticky top-0 z-20 bg-neutral-50 shadow-[inset_0_-1px_0_var(--border)]">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="bg-neutral-50">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  const pinned = header.column.getIsPinned()
+                  return (
+                    <TableHead
+                      key={header.id}
+                      style={getPinningStyles(header.column)}
+                      className={cn(
+                        "bg-neutral-50",
+                        pinned === "left" &&
+                          "z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.2)]",
+                        pinned === "right" &&
+                          "z-30 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.2)]",
+                      )}
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
+                  )
+                })}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  className="group/row"
+                >
+                  {row.getVisibleCells().map((cell) => {
+                    const pinned = cell.column.getIsPinned()
+                    return (
+                      <TableCell
+                        key={cell.id}
+                        style={getPinningStyles(cell.column)}
+                        className={cn(
+                          pinned &&
+                            "z-10 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted",
+                          pinned === "left" &&
+                            "shadow-[2px_0_5px_-2px_rgba(0,0,0,0.2)]",
+                          pinned === "right" &&
+                            "shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.2)]",
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    )
+                  })}
                 </TableRow>
               ))
             ) : (
