@@ -108,13 +108,19 @@ function downloadCsv(rows: Project[]) {
 }
 
 // Sticky positioning styles for pinned (sticky) columns.
+// A fixed width is required so the sticky left/right offsets (derived from
+// column sizes) line up exactly with the rendered cell widths.
 function getPinningStyles(column: Column<Project>): React.CSSProperties {
   const pinned = column.getIsPinned()
   if (!pinned) return {}
+  const width = column.getSize()
   return {
     position: "sticky",
     left: pinned === "left" ? column.getStart("left") : undefined,
     right: pinned === "right" ? column.getAfter("right") : undefined,
+    width,
+    minWidth: width,
+    maxWidth: width,
   }
 }
 
