@@ -79,6 +79,7 @@ function SortButton({
 export const columns: ColumnDef<Project>[] = [
   {
     id: "select",
+    size: 48,
     enableHiding: false,
     enableSorting: false,
     header: ({ table }) => (
@@ -99,6 +100,7 @@ export const columns: ColumnDef<Project>[] = [
   },
   {
     accessorKey: "id",
+    size: 96,
     header: ({ column }) => (
       <SortButton
         label="ID"
@@ -257,6 +259,7 @@ export const columns: ColumnDef<Project>[] = [
   },
   {
     id: "actions",
+    size: 64,
     enableHiding: false,
     enableSorting: false,
     cell: ({ row }) => (
