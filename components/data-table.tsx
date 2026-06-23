@@ -91,7 +91,9 @@ function downloadCsv(rows: Project[]) {
   ]
   const escape = (value: unknown) => {
     const str = String(value ?? "")
-    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
+    // CHANGED: also quote fields containing a carriage return (\r), not just \n,
+    // so values pasted from Windows/Excel keep their CSV structure intact.
+    return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
   }
   const csv = [
     headers.join(","),
@@ -128,10 +130,12 @@ function getPinningStyles(column: Column<Project>, isHeader = false): React.CSSP
     borderRight: isLeftEdge ? "1px solid var(--border)" : undefined,
     borderLeft: isRightEdge ? "1px solid var(--border)" : undefined,
     // Shadow cast onto the scrolling content — always visible while sticky.
+    // CHANGED: use the theme's --border token (via color-mix for opacity) instead
+    // of a hardcoded black rgba, so the pinned-edge shadow remains visible in dark mode.
     boxShadow: isLeftEdge
-      ? "4px 0 8px -2px rgba(0,0,0,0.15)"
+      ? "4px 0 8px -2px color-mix(in oklch, var(--border) 70%, transparent)"
       : isRightEdge
-        ? "-4px 0 8px -2px rgba(0,0,0,0.15)"
+        ? "-4px 0 8px -2px color-mix(in oklch, var(--border) 70%, transparent)"
         : undefined,
     // Header cells sit above body cells; bump their z-index accordingly.
     zIndex: isHeader ? 31 : 11,
@@ -146,6 +150,11 @@ export function DataTable() {
   const [rowSelection, setRowSelection] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState("")
   const [expanded, setExpanded] = React.useState(false)
+  // CHANGED: track the "sticky edges" toggle as its own boolean instead of
+  // inferring it from `columnPinning.left.length`. The previous derivation
+  // coupled the toggle's UI state to the pinning internals, so any future code
+  // that pinned a column independently would desync the switch.
+  const [stickyEdges, setStickyEdges] = React.useState(false)
   const [columnPinning, setColumnPinning] = React.useState<ColumnPinningState>({
     left: [],
     right: [],
@@ -197,10 +206,10 @@ export function DataTable() {
 
   const visibleColumns = table.getVisibleLeafColumns()
 
-  // Sticky edge columns: pin the first column to the left and last to the right.
-  const stickyEdges = (columnPinning.left?.length ?? 0) > 0
-
+  // Sticky edge columns: pin the first two columns to the left and the last to
+  // the right, driven by the dedicated `stickyEdges` state above.
   const toggleStickyEdges = (checked: boolean) => {
+    setStickyEdges(checked)
     if (checked) {
       const leaves = table.getAllLeafColumns()
       const left = leaves.slice(0, 2).map((c) => c.id)
@@ -217,14 +226,16 @@ export function DataTable() {
   const tableUi = (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-card">
       {/* Sticky controls bar */}
-      <div className="flex flex-wrap items-center gap-2 border-b bg-neutral-100 p-3">
+      {/* CHANGED: bg-neutral-100 -> bg-muted (semantic token) so it adapts to dark mode */}
+      <div className="flex flex-wrap items-center gap-2 border-b bg-muted p-3">
         <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          {/* CHANGED: bg-white -> bg-background so the input isn't a white block in dark mode */}
           <Input
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder="Search projects..."
-            className="h-9 bg-white pl-8"
+            className="h-9 bg-background pl-8"
             aria-label="Search"
           />
         </div>
@@ -246,7 +257,8 @@ export function DataTable() {
           )}
 
           {/* Sticky edge columns toggle */}
-          <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium">
+          {/* CHANGED: bg-white -> bg-background for dark-mode support */}
+          <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border bg-background px-3 text-sm font-medium">
             <Pin
               className={cn(
                 "size-4",
@@ -340,7 +352,8 @@ export function DataTable() {
           and the horizontal scrollbar stays pinned just above the footer */}
       <div className="relative min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-[32rem] caption-bottom text-sm">
-          <TableHeader className="sticky top-0 z-20 bg-neutral-50 shadow-[inset_0_-1px_0_var(--border)]">
+          {/* CHANGED: bg-neutral-50 -> bg-muted (semantic token) for dark-mode support */}
+          <TableHeader className="sticky top-0 z-20 bg-muted shadow-[inset_0_-1px_0_var(--border)]">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
@@ -349,7 +362,8 @@ export function DataTable() {
                     <TableHead
                       key={header.id}
                       style={getPinningStyles(header.column, true)}
-                      className={cn("bg-neutral-50", pinned && "z-30")}
+                      // CHANGED: bg-neutral-50 -> bg-muted so pinned header cells match the header in dark mode
+                      className={cn("bg-muted", pinned && "z-30")}
                     >
                       {header.isPlaceholder
                         ? null
@@ -400,7 +414,8 @@ export function DataTable() {
       </div>
 
       {/* Sticky footer */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-neutral-100 px-3 py-2.5">
+      {/* CHANGED: bg-neutral-100 -> bg-muted (semantic token) for dark-mode support */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted px-3 py-2.5">
         <div className="text-sm text-muted-foreground">
           {selectedCount > 0 ? `${selectedCount} of ` : ""}
           <span className="font-medium text-foreground">{filteredRows.length}</span>{" "}

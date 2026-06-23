@@ -24,7 +24,8 @@ import {
 
 // Extend TanStack's table meta so cells can mutate the source data.
 declare module "@tanstack/react-table" {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // CHANGED: removed an unused `eslint-disable-next-line` directive (ESLint flagged
+  // it as unnecessary). The `TData` param is required by the interface signature.
   interface TableMeta<TData extends RowData> {
     updateData: (rowId: string, columnId: string, value: unknown) => void
   }

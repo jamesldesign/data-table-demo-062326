@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // CHANGED: was `ignoreBuildErrors: true` (a v0 default). Letting type errors
+  // fail the build means regressions are caught in CI instead of shipping silently.
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,

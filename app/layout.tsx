@@ -9,10 +9,11 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+// CHANGED: replaced the default v0 placeholder title/description/generator with
+// values that describe this app. (Removed the `generator` field entirely.)
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'Projects · Data Table Demo',
+  description: 'A data table built with Next.js, shadcn/ui and TanStack Table.',
   icons: {
     icon: [
       {
