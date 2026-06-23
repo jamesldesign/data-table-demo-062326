@@ -53,6 +53,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -175,19 +176,21 @@ export function DataTable() {
             )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-44">
-            <DropdownMenuLabel>Status</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {STATUS_OPTIONS.map((status) => (
-              <DropdownMenuCheckboxItem
-                key={status}
-                className="capitalize"
-                checked={statusFilter.includes(status)}
-                onCheckedChange={(checked) => toggleStatus(status, !!checked)}
-                closeOnClick={false}
-              >
-                {status}
-              </DropdownMenuCheckboxItem>
-            ))}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Status</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {STATUS_OPTIONS.map((status) => (
+                <DropdownMenuCheckboxItem
+                  key={status}
+                  className="capitalize"
+                  checked={statusFilter.includes(status)}
+                  onCheckedChange={(checked) => toggleStatus(status, !!checked)}
+                  closeOnClick={false}
+                >
+                  {status}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -198,21 +201,23 @@ export function DataTable() {
             Columns
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide() && COLUMN_LABELS[column.id])
-              .map((column) => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                  closeOnClick={false}
-                >
-                  {COLUMN_LABELS[column.id]}
-                </DropdownMenuCheckboxItem>
-              ))}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide() && COLUMN_LABELS[column.id])
+                .map((column) => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                    closeOnClick={false}
+                  >
+                    {COLUMN_LABELS[column.id]}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
 
