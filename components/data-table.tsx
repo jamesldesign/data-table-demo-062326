@@ -482,7 +482,7 @@ export function DataTable() {
 
   return (
     <>
-      <div className={cn("flex min-h-0 flex-1 flex-col", expanded && "invisible")}>
+      <div className={cn("flex min-h-[30rem] max-h-[50rem] flex-col", expanded && "invisible")}>
         {!expanded && tableUi}
       </div>
 
